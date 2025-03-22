@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:sample_classroom/screens/assignments.dart';
 import 'package:sample_classroom/screens/courses.dart';
 import 'package:sample_classroom/screens/login_signup.dart';
+import 'package:sample_classroom/screens/quiz.dart';
+import 'package:sample_classroom/screens/teacher_dashboard_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -72,7 +75,15 @@ class SmartLearningApp extends StatelessWidget {
           elevation: 4,
         ),
       ),
-      home: const LoginSignupScreen(), // CoursesScreen(userId: 'kLqG4VAbHhQgEkm61gtd3LLJHu13',), // LoginSignupScreen(),
+      initialRoute: '/login',
+      routes: {
+
+        '/login': (context) => TeacherDashboardScreen(), // LoginSignupScreen(),
+        '/courses': (context) => CoursesScreen(userId: 'kLqG4VAbHhQgEkm61gtd3LLJHu13'),
+        '/teacher_dashboard': (context) => TeacherDashboardScreen(),
+        '/manage_assignments': (context) => AssignmentScreen(),
+        '/manage_quizzes': (context) => QuizScreen(),
+      },
     );
   }
 }

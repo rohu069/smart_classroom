@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sample_classroom/screens/CourseDetailsScreen.dart';
 
 
@@ -35,25 +35,46 @@ class _CoursesScreenState extends State<CoursesScreen> {
     });
   }
 
-  Widget _buildCourseCard(BuildContext context, Map<String, dynamic> course) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ListTile(
-        title: Text(course['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(course['description']),
-        trailing: const Icon(Icons.arrow_forward_ios),
-        onTap: () {
-          // Navigate to Course Details Screen
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CourseDetailsScreen(courseId: course['id']),
+Widget _buildCourseCard(BuildContext context, Map<String, dynamic> course) {
+  return Card(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    child: Column(
+      children: [
+        ListTile(
+          title: Text(course['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(course['description']),
+          trailing: const Icon(Icons.arrow_forward_ios),
+          onTap: () {
+            // Navigate to Course Details Screen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CourseDetailsScreen(courseId: course['id']),
+              ),
+            );
+          },
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            TextButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/assignments');
+              },
+              child: const Text("Assignments"),
             ),
-          );
-        },
-      ),
-    );
-  }
+            TextButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/quiz');
+              },
+              child: const Text("Quiz"),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
