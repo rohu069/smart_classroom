@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'package:sample_classroom/screens/manage_courses_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'login_signup.dart';
 
@@ -35,7 +36,9 @@ Future<void> _fetchTeacherData() async {
         .doc(user.uid)
         .get();
     if (userDoc.exists) {
-      teacherName = userDoc["name"] ?? "Teacher";
+      setState(() {  // Update teacherName inside setState()
+        teacherName = userDoc["name"] ?? "Teacher";
+      });
     }
 
     QuerySnapshot courseSnapshot = await FirebaseFirestore.instance
@@ -53,7 +56,6 @@ Future<void> _fetchTeacherData() async {
         'description': data['description'] ?? 'No description available',
         'students': data['students'] ?? 0,
         'courseLink': data['courseLink'] ?? "https://sampleclassrooms.com/course/${doc.id}",
-
       });
     }
 
@@ -124,157 +126,222 @@ void launchURL(String url) async {
   }
 }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.indigo,
-        title: Text(
-          "Welcome, $teacherName",
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.grey[100],
+    appBar: AppBar(
+      elevation: 0,
+      backgroundColor: Colors.indigo,
+      title: Text(
+        "Welcome, $teacherName",
+        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout, color: Colors.white),
+          onPressed: _logout,
+          tooltip: "Logout",
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _logout,
-            tooltip: "Logout",
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addNewCourse,
-        backgroundColor: Colors.indigo,
-        child: const Icon(Icons.add),
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Stats Section
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                    color: Colors.indigo,
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            _statCard("Total Courses", "${courses.length}", Icons.book),
-                            const SizedBox(width: 16),
-                            _statCard("Total Students", 
-                              "${courses.fold(0, (sum, course) => sum + (course['students'] as int))}", 
-                              Icons.people),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+      ],
+    ),
+    floatingActionButton: FloatingActionButton(
+      onPressed: _addNewCourse,
+      backgroundColor: Colors.indigo,
+      child: const Icon(Icons.add),
+    ),
+    body: isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Stats Section
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  color: Colors.indigo,
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          _statCard("Total Courses", "${courses.length}", Icons.book),
+                          const SizedBox(width: 16),
+_statCard("Total Students", 
+  "${courses.fold(0, (sum, course) {
+    var students = course['students'];
+    
+    // If students is a List, return its length; if it's an int, return the int value
+    int studentCount = (students is List) ? students.length : (students is int ? students : 0);
 
-                  // Quick Actions
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Quick Actions",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          children: [
-                            _actionCard("Manage Courses", Icons.book, Colors.blue[700]!, () {
-                              // Navigate to courses management screen
-                            }),
-                            _actionCard("Manage Students", Icons.people, Colors.green[700]!, () {
-                              // Navigate to student management screen
-                            }),
-                            _actionCard("Assignments", Icons.assignment, Colors.orange[700]!, () {
-                              // Navigate to assignments screen
-                            }),
-                            _actionCard("Profile", Icons.person, Colors.purple[700]!, () {
-                              // Navigate to profile screen
-                            }),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+    return sum + studentCount;
+  })}", 
+  Icons.people
+),
 
-                  // My Courses Section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "My Courses",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: _addNewCourse,
-                          child: const Text("Add New"),
-                        ),
-                      ],
-                    ),
+
+                        ],
+                      ),
+                    ],
                   ),
-                  
-                  courses.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32.0),
-                            child: Column(
-                              children: [
-                                const Icon(Icons.book_outlined, size: 64, color: Colors.grey),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  "You don't have any courses yet",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                ElevatedButton(
-                                  onPressed: _addNewCourse,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.indigo,
-                                  ),
-                                  child: const Text("Create Your First Course"),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(16),
-                          itemCount: courses.length,
-                          itemBuilder: (context, index) {
-                            final course = courses[index];
-                            return _courseCard(course);
-                          },
+                ),
+
+                // Quick Actions
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Quick Actions",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
-                ],
-              ),
+                      ),
+                      const SizedBox(height: 16),
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        children: [
+_smallActionCard(
+  "Manage Courses",
+  Icons.book,
+  Colors.blue[700]!,
+  () {
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => ManageCoursesScreen(courses: courses),
+  ),
+);
+
+  },
+),
+
+                          _smallActionCard("Manage Students", Icons.people, Colors.green[700]!, () {
+                            // Navigate to student management screen
+                          }),
+                          _smallActionCard("Assignments", Icons.assignment, Colors.orange[700]!, () {
+                            // Navigate to assignments screen
+                          }),
+                          _smallActionCard("Profile", Icons.person, Colors.purple[700]!, () {
+                            // Navigate to profile screen
+                          }),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-    );
-  }
+          ),
+  );
+}
+
+// Smaller Action Cards
+Widget _smallActionCard(String title, IconData icon, Color color, VoidCallback onTap) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 30, color: color),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+// Show Courses Inside "Manage Courses"
+// void _showCoursesDialog(BuildContext context) {
+//   showDialog(
+//     context: context,
+//     builder: (BuildContext context) {
+//       return AlertDialog(
+//         title: const Text("Your Courses"),
+//         content: SizedBox(
+//           width: double.maxFinite,
+//           child: courses.isEmpty
+//               ? const Text("You don't have any courses yet.")
+//               : ListView.builder(
+//                   shrinkWrap: true,
+//                   itemCount: courses.length,
+//                   itemBuilder: (context, index) {
+//                     final course = courses[index];
+//                     return ListTile(
+//                       title: Text(course['title']),
+//                       subtitle: Column(
+//                         crossAxisAlignment: CrossAxisAlignment.start,
+// children: [
+//   Text(
+//     "Students: ${(course['students'] is List ? course['students'].length : (course['students'] ?? 0))}"
+//   ),
+//   if (course['courseLink'] != null) // Check if link exists
+//     Row(
+//       children: [
+//         GestureDetector(
+//           onTap: () {
+//             // Open course link in browser
+//             launchUrl(Uri.parse(course['courseLink']));
+//           },
+//           child: Text(
+//             "Open Link",
+//             style: TextStyle(
+//               color: Colors.blue,
+//               decoration: TextDecoration.underline,
+//             ),
+//           ),
+//         ),
+//         SizedBox(width: 10), // Spacing between options
+//         GestureDetector(
+//           onTap: () {
+//             Clipboard.setData(ClipboardData(text: course['courseLink']));
+//             ScaffoldMessenger.of(context).showSnackBar(
+//               SnackBar(content: Text("Link copied to clipboard!")),
+//             );
+//           },
+//           child: Text(
+//             "Copy Link",
+//             style: TextStyle(
+//               color: Colors.blue,
+//               decoration: TextDecoration.underline,
+//             ),
+//           ),
+//         ),
+//       ],
+//     ),
+// ],
+
+//                       ),
+//                       trailing: Icon(Icons.arrow_forward, color: Colors.indigo),
+//                       onTap: () {
+//                         // Open course details or management
+//                       },
+//                     );
+//                   },
+//                 ),
+//         ),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Navigator.pop(context),
+//             child: const Text("Close"),
+//           ),
+//         ],
+//       );
+//     },
+//   );
+// }
 
   Widget _statCard(String title, String value, IconData icon) {
     return Expanded(

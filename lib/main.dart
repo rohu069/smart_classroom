@@ -72,7 +72,7 @@ class SmartLearningApp extends StatelessWidget {
           elevation: 4,
         ),
       ),
-      home: const CoursesScreen(userId: 'kLqG4VAbHhQgEkm61gtd3LLJHu13',), // LoginSignupScreen(),
+      home: const LoginSignupScreen(), // CoursesScreen(userId: 'kLqG4VAbHhQgEkm61gtd3LLJHu13',), // LoginSignupScreen(),
     );
   }
 }

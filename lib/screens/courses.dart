@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:sample_classroom/screens/assignments.dart';
 import 'classes.dart';
@@ -13,60 +14,100 @@ class CoursesScreen extends StatefulWidget {
 }
 
 class _CoursesScreenState extends State<CoursesScreen> {
-  Future<void> joinCourse(String userId, String courseId) async {
-    DocumentReference courseRef = FirebaseFirestore.instance.collection('courses').doc(courseId);
-    DocumentReference userRef = FirebaseFirestore.instance.collection('users').doc(userId);
 
+
+  void _enrollInCourse(String courseId) async {
+  User? user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
     try {
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        DocumentSnapshot courseSnapshot = await transaction.get(courseRef);
-        DocumentSnapshot userSnapshot = await transaction.get(userRef);
-
-        List students = List.from(courseSnapshot['studentsEnrolled']);
-        if (!students.contains(userId)) {
-          students.add(userId);
-          transaction.update(courseRef, {'studentsEnrolled': students});
-        }
-
-        List enrolledCourses = List.from(userSnapshot['enrolledCourses']);
-        if (!enrolledCourses.contains(courseId)) {
-          enrolledCourses.add(courseId);
-          transaction.update(userRef, {'enrolledCourses': enrolledCourses});
-        }
+      await FirebaseFirestore.instance.collection("courses").doc(courseId).update({
+        'students': FieldValue.arrayUnion([user.uid])
       });
 
-      // Force UI refresh
-      if (mounted) {
-        setState(() {});
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enrolled Successfully!"))
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Error joining the course")),
-        );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Enrollment Failed: $e"))
+      );
+    }
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("User not logged in"))
+    );
+  }
+}
+
+
+
+Future<void> joinCourse(String userId, String courseId) async {
+  DocumentReference courseRef = FirebaseFirestore.instance.collection('courses').doc(courseId);
+  DocumentReference userRef = FirebaseFirestore.instance.collection('users').doc(userId);
+
+  try {
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      DocumentSnapshot courseSnapshot = await transaction.get(courseRef);
+      DocumentSnapshot userSnapshot = await transaction.get(userRef);
+
+      // Ensure data exists and cast it properly
+      Map<String, dynamic>? courseData = courseSnapshot.data() as Map<String, dynamic>?;
+      Map<String, dynamic>? userData = userSnapshot.data() as Map<String, dynamic>?;
+
+      if (courseData == null || userData == null) {
+        throw Exception("Document data is null");
       }
+
+      List students = List.from(courseData['studentsEnrolled'] ?? []);
+      if (!students.contains(userId)) {
+        students.add(userId);
+        transaction.update(courseRef, {'studentsEnrolled': students});
+      }
+
+      List enrolledCourses = List.from(userData['enrolledCourses'] ?? []);
+      if (!enrolledCourses.contains(courseId)) {
+        enrolledCourses.add(courseId);
+        transaction.update(userRef, {'enrolledCourses': enrolledCourses});
+      }
+    });
+
+    // Force UI refresh
+    if (mounted) {
+      setState(() {});
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error joining the course: $e")),
+      );
     }
   }
+}
 
-  Stream<List<Map<String, dynamic>>> getUserEnrolledCourses(String userId) {
-    return FirebaseFirestore.instance.collection('users').doc(userId).snapshots().asyncMap((snapshot) async {
-      List<dynamic> enrolledCourses = snapshot['enrolledCourses'] ?? [];
+Stream<List<Map<String, dynamic>>> getUserEnrolledCourses(String userId) {
+  return FirebaseFirestore.instance.collection('users').doc(userId).snapshots().asyncMap((snapshot) async {
+    List<dynamic> enrolledCourses = snapshot.data()?['enrolledCourses'] ?? [];
 
-      List<Map<String, dynamic>> courses = [];
-      for (String courseId in enrolledCourses) {
-        DocumentSnapshot courseSnapshot =
-            await FirebaseFirestore.instance.collection('courses').doc(courseId).get();
-        if (courseSnapshot.exists) {
-          courses.add({
-            'id': courseSnapshot.id,
-            'name': courseSnapshot['name'],
-            'description': courseSnapshot['description'],
-          });
-        }
+    if (enrolledCourses.isEmpty) return [];
+
+    List<Future<Map<String, dynamic>?>> courseFutures = enrolledCourses.map((courseId) async {
+      DocumentSnapshot courseSnapshot =
+          await FirebaseFirestore.instance.collection('courses').doc(courseId).get();
+
+      if (courseSnapshot.exists) {
+        return {
+          'id': courseSnapshot.id,
+          'title': courseSnapshot['title'],
+          'description': courseSnapshot['description'],
+        };
       }
-      return courses;
-    });
-  }
+      return null;
+    }).toList();
+
+    List<Map<String, dynamic>> courses = (await Future.wait(courseFutures)).whereType<Map<String, dynamic>>().toList();
+    return courses;
+  });
+}
 
   void _showJoinClassDialog(BuildContext context) {
     TextEditingController linkController = TextEditingController();
@@ -162,30 +203,30 @@ class _CoursesScreenState extends State<CoursesScreen> {
     );
   }
 
-  Widget _buildNavButton(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap) {
-    return ElevatedButton(
-      onPressed: onTap,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 30, color: Colors.white),
-          const SizedBox(height: 4),
-          Text(title, style: const TextStyle(color: Colors.white)),
-        ],
-      ),
-    );
-  }
+Widget _buildNavButton(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap, String courseId) {
+  return ElevatedButton(
+    onPressed: () => _enrollInCourse(courseId), // Now courseId is passed correctly
+    style: ElevatedButton.styleFrom(
+      backgroundColor: color,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 30, color: Colors.white),
+        const SizedBox(height: 4),
+        Text(title, style: const TextStyle(color: Colors.white)),
+      ],
+    ),
+  );
+}
 
   Widget _buildCourseCard(BuildContext context, Map<String, dynamic> course) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ListTile(
-        title: Text(course['name']),
+        title: Text(course['title']),
         subtitle: Text(course['description']),
         trailing: Icon(Icons.arrow_forward_ios),
         onTap: () {
@@ -221,56 +262,62 @@ class _CoursesScreenState extends State<CoursesScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             child: Row(
               children: [
-                Expanded(
-                  child: _buildNavButton(
-                    context,
-                    'Classes',
-                    Icons.class_rounded,
-                    Theme.of(context).colorScheme.primary,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ClassesScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+Expanded(
+  child: _buildNavButton(
+    context,
+    'Classes',
+    Icons.class_rounded,
+    Theme.of(context).colorScheme.primary,
+    () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ClassesScreen(),
+        ),
+      );
+    },
+    "", // Add this empty courseId as a placeholder
+  ),
+),
+
                 const SizedBox(width: 16),
-                Expanded(
-                  child: _buildNavButton(
-                    context,
-                    'Assignments',
-                    Icons.assignment_rounded,
-                    Theme.of(context).colorScheme.secondary,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AssignmentScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+ Expanded(
+  child: _buildNavButton(
+    context,
+    'Assignments',
+    Icons.assignment_rounded,
+    Theme.of(context).colorScheme.secondary,
+    () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AssignmentScreen(),
+        ),
+      );
+    },
+    "", // Add missing courseId argument
+  ),
+),
+
                 const SizedBox(width: 16),
-                Expanded(
-                  child: _buildNavButton(
-                    context,
-                    'Quizzes',
-                    Icons.quiz_rounded,
-                    Theme.of(context).colorScheme.tertiary,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => QuizScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+Expanded(
+  child: _buildNavButton(
+    context,
+    'Quizzes',
+    Icons.quiz_rounded,
+    Theme.of(context).colorScheme.tertiary,
+    () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QuizScreen(),
+        ),
+      );
+    },
+    "", // Add missing courseId argument
+  ),
+),
+
               ],
             ),
           ),
